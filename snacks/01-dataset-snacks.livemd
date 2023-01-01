@@ -1,0 +1,125 @@
+# Training a Deep Learning Model - Datasource Download
+
+```elixir
+Mix.install([
+  {:req, "~> 0.3.3"}
+])
+```
+
+## Training a Deep Learning Model
+
+This is the first notebook, in a series of notebooks, where we will discuss the modern aspects of training a neural network.  We are focused on training the best model we can in the shortest period of time.  We'll learn tricks and tips that can help you apply deep learning in your domain or area of interest.
+
+We've purposely broken this notebook separately from the other notebooks in the series.  We only want to download the data one time.
+
+## Snacks Dataset
+
+We'll be working with the Snacks dataset found on Huggingface.![](images/hf_snacks.png)
+
+## Supervised Training
+
+The snacks dataset was originally developed as a supervised training problem. Supervised just means that the dataset has known answers. For each image, the dataset identifies the type of snack. We want to train a deep learning (DL) model to scan the image and identify the type of snack.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Often you'll see mathmatical labels associated with the deep learning concepts.  We'll lightly touch on the "math" as needed.  We are strongly focused on a code first approach, but we need names for concepts and we need to learn from others in the DL field.
+
+For supervised training, the independent variable is often called x and the dependent variable is y.  The DL model is like a function that receives an image and makes a prediction y.
+
+$$ f(x) = y $$
+
+In our case the _image_ is the independent variable.  The snack type is the dependent variable.  Given an image, x, the model identifies its best guess for the snack, y.
+
+## Downloading Snack Data
+
+The Snacks dataset has 20 kinds of single classification images. https://huggingface.co/datasets/Matthijs/snacks.  Each image has only one classification (single classification).  You could think of single classification like each image has one right answer and it must have a right answer.
+
+The key paths to download the files are:
+https://huggingface.co/datasets/Matthijs/snacks/resolve/main/images.zip
+https://huggingface.co/datasets/Matthijs/snacks/resolve/main/credits.csv
+
+![](images/snack_download.png)
+
+## Loading from Urls
+
+We've put together some basic functions to download from a url and unzip zipped files.  The first function downloads the data at a url and puts the file in the destination directory.
+
+The function has lots of room for improvement.  The file isn't processed in a stream and the error handling is absent.
+
+```elixir
+download_file = fn url, dest_dir ->
+  # mkdir unless it exists
+  _ = File.mkdir(dest_dir)
+
+  filename =
+    String.split(url, "/")
+    |> Enum.at(-1)
+
+  local_file_path = dest_dir <> "/" <> filename
+
+  if File.exists?(local_file_path) do
+    File.rm(local_file_path)
+  end
+
+  {:ok, response} = Req.get(url)
+  binary = response.body
+
+  local_file = File.open!(local_file_path, [:write, :binary])
+  IO.binwrite(local_file, binary)
+  local_file_path
+end
+```
+
+The second function unzips a *.zip file and places the results in the directory where the zip file resides.
+
+Again, there are opportunities to improve the robustness.  If we generalize to download any file pointed at by a url, we could automatically uncompress the file.  It would require detecting the compression technique.  The SciData utils module offers some ideas in this area.
+
+```elixir
+unzip = fn path_to_zip_file ->
+  parent_dir =
+    String.split(path_to_zip_file, "/")
+    |> List.delete_at(-1)
+    |> Enum.join("/")
+
+  cwd = String.to_charlist(parent_dir)
+
+  String.to_charlist(System.get_env("PWD") <> "/" <> path_to_zip_file)
+  |> :zip.unzip(cwd: cwd)
+end
+```
+
+So let's set up our configuration for where we want our Snacks data.
+
+```elixir
+# Project information used in the notebook
+
+src_data_dir = "data/snacks"
+```
+
+## Downloading the images and answers
+
+After running the following cell, the snacks images and a CSV file should be in the src_data_dir location.
+
+```elixir
+images_path =
+  download_file.(
+    "https://huggingface.co/datasets/Matthijs/snacks/resolve/main/images.zip",
+    src_data_dir
+  )
+```
+
+Since we've downloaded a zip file, let's unzip the file in the same location as the zip file.
+
+```elixir
+unzip.(images_path)
+:ok
+```
+
+```elixir
+download_file.(
+  "https://huggingface.co/datasets/Matthijs/snacks/resolve/main/credits.csv",
+  src_data_dir
+)
+```
+
+We have our dataset available locally.  We'll leave this notebook as it stands.  If we need to re-download the data, we can re-run this notebook.
